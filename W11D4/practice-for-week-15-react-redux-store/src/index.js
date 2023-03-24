@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import {configureStore} from "./store/index.js"
+import configureStore from "./store/index.js"
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
