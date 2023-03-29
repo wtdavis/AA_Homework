@@ -1,5 +1,11 @@
 class ApplicationController < ActionController::API
-    before_action :snake_case_params
+    include ActionController::RequestForgeryProtection
+    before_action :snake_case_params, :attach_authenticity_token
+    protect_from_forgery with: :exception
+
+rescue_from StandardError, with: :unhandled_error
+rescue_from ActionController::InvalidAuthenticityToken,
+with: :invalid_authenticity_token
 
 
     def current_user
@@ -7,8 +13,8 @@ class ApplicationController < ActionController::API
     end
 
     def login!(user)
-        user.reset_session_token!
-        session[:session_token] = user.session_token
+        session[:session_token] = user.reset_session_token!
+        @current_user = user
     end
 
     def logout!
@@ -18,11 +24,21 @@ class ApplicationController < ActionController::API
     end
 
     def require_logged_in
-        unless current_user
+        unless logged_in?
             render json: { message: "Unauthorized"}, status: :unauthorized
         end
     end
 
+    def require_logged_out
+        if logged_in?
+            render json: { message: "Unauthorized"}, status: :unauthorized
+        end
+    end
+
+    def logged_in?
+        !!@current_user
+    end
+    
     def test
         if params.has_key?(:login)
             login!(User.first)
@@ -37,6 +53,7 @@ class ApplicationController < ActionController::API
         end
     end
 
+  
 
 
     private
@@ -45,5 +62,25 @@ class ApplicationController < ActionController::API
         params.deep_transform_keys!(&:underscore)
     end
 
+    def attach_authenticity_token
+        headers['X-CSRF-Token'] = masked_authenticity_token(session)
+    end
+
+    def invalid_authenticity_token
+        render json: {message: 'Invalid Authenticity Token'},
+        status: :unprocessable_entity
+    end
+
+    def unhandled_error(error)
+        if request.accepts.first.html?
+            raise error
+        else
+            @message = "#{error.class} - #{error.message}"
+            @stack = Rails::BacktraceCleaner.new.clean(error.backtrace)
+            render 'api/errors/internal_server_error', status: :internal_server_error
+            
+            logger.error "\n#{@message}: \n\t#{@stack.join("\n\t")}\n"
+        end
+    end
 
 end

@@ -42,13 +42,15 @@ class User < ApplicationRecord
     if user && user.authenticate(password)
       return user
     else
-      return false
+      return nil
     end
   
   end
 
   def reset_session_token!
     self.session_token = generate_unique_session_token
+    self.save!
+    return session_token
   end
 
 end
